@@ -1,39 +1,185 @@
-  <!DOCTYPE html>
-<html>
+<!DOCTYPE html>
+<html lang="zh-Hant">
 <head>
-    <title>ELI 管理平台</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://accounts.google.com/gsi/client" onload="initClient()" async defer></script>
+    <title>ELI/ELN Manager - RM Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f5f5f7; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        input, select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #007AFF; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
-        th, td { padding: 12px; border: 1px solid #eee; text-align: left; font-size: 14px; }
-        #status { color: #666; font-size: 12px; text-align: center; margin-bottom: 10px; }
+        :root {
+            --primary-color: #1a73e8;
+            --success-color: #34a853;
+            --warning-color: #fbbc05;
+            --danger-color: #ea4335;
+            --bg-color: #f8f9fa;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 25px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        
+        label { display: block; font-size: 0.85rem; color: #666; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        
+        .stock-tag { background: #e8f0fe; color: var(--primary-color); padding: 5px 10px; border-radius: 4px; font-weight: bold; margin-right: 5px; display: inline-block; }
+        
+        .result-panel { background: #fffde7; border: 1px solid #fff59d; padding: 15px; border-radius: 8px; margin-top: 20px; }
+        .timeline { display: flex; justify-content: space-between; margin: 20px 0; position: relative; padding-top: 20px; }
+        .timeline::before { content: ''; position: absolute; top: 30px; left: 0; right: 0; height: 2px; background: #ddd; z-index: 1; }
+        .time-node { position: relative; z-index: 2; background: white; text-align: center; font-size: 0.75rem; width: 80px; }
+        
+        #qrcode { margin-top: 15px; text-align: center; }
+        button { background: var(--primary-color); color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { opacity: 0.9; }
     </style>
 </head>
 <body>
 
-    <h2>ELI 管理平台</h2>
-    <div id="status">請先登入以同步 Google Drive</div>
-    <button id="auth_btn" onclick="handleAuthClick()">使用 Google 帳號登入</button>
+<div class="container">
+    <header>
+        <h1>ELI/ELN 投資管理 (RM 專用)</h1>
+        <div id="user-info">Google Drive 已連線</div>
+    </header>
 
-    <div id="main-content" style="display:none;">
-        <div class="card">
-            <h3>新增 ELI 項目</h3>
-            <input type="text" id="clientName" placeholder="客戶姓名">
-            <select id="market"><option value="HK">港股</option><option value="US">美股</option></select>
-            <select id="currency">
-                <option value="HKD">HKD</option><option value="USD">USD</option><option value="CNY">CNY</option>
-                <option value="EUR">EUR</option><option value="GBP">GBP</option><option value="AUD">AUD</option>
-                <option value="NZD">NZD</option><option value="CAD">CAD</option><option value="JPY">JPY</option>
-            </select>
-            <input type="text" id="stockCode" placeholder="股票代號 (如 0700.HK)">
-            <select id="koType">
-                <option value="Daily">Daily</option><option value="Daily Memory">Daily Memory</option><option value="Period End">Period End</option>
+    <div class="card">
+        <h3>1. 產品資料輸入</h3>
+        <div class="grid">
+            <div>
+                <label>客戶名稱</label>
+                <input type="text" id="clientName" placeholder="例如：陳大文">
+            </div>
+            <div>
+                <label>掛鉤市場</label>
+                <select id="market">
+                    <option value="HK">港股 (HKD)</option>
+                    <option value="US">美股 (USD)</option>
+                </select>
+            </div>
+            <div>
+                <label>投資金額 (本金)</label>
+                <input type="number" id="principal" value="1000000">
+            </div>
+            <div>
+                <label>年化利率 (Coupon % p.a.)</label>
+                <input type="number" id="annualRate" value="15.5" step="0.1">
+            </div>
+        </div>
+
+        <div class="grid" style="margin-top: 15px;">
+            <div>
+                <label>掛鉤股票 (最多4隻，用逗號隔開)</label>
+                <input type="text" id="stocks" placeholder="例如: NVDA, GOOG, AAPL, MSFT">
+            </div>
+            <div>
+                <label>產品機制</label>
+                <select id="structure">
+                    <option value="Daily Autocall">Daily Autocall (全部過價)</option>
+                    <option value="Daily Memory">Daily Memory (分開過價)</option>
+                    <option value="European">European (每月觀察)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>2. 關鍵日期設定</h3>
+        <div class="grid">
+            <div><label>Trade Date (今日)</label><input type="date" id="tradeDate"></div>
+            <div><label>Issue Date (生效日)</label><input type="date" id="issueDate"></div>
+            <div><label>Fixing Day (定價日)</label><input type="date" id="fixingDate"></div>
+            <div><label>Maturity Date (到期日)</label><input type="date" id="maturityDate"></div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+            <button onclick="updateDashboard()">即時更新數據 & 儲存</button>
+        </div>
+    </div>
+
+    <div class="card" id="dashboard" style="display:none;">
+        <div style="display: flex; justify-content: space-between;">
+            <h3>3. 合約即時概覽</h3>
+            <span id="liveStatus" class="status-tag">監控中</span>
+        </div>
+        
+        <div id="stockList" style="margin-bottom: 20px;"></div>
+
+        <div class="timeline">
+            <div class="time-node">Trade<br><b id="t_trade"></b></div>
+            <div class="time-node">Issue<br><b id="t_issue"></b></div>
+            <div class="time-node" style="color: var(--primary-color);">Today<br><b>NOW</b></div>
+            <div class="time-node">Fixing<br><b id="t_fixing"></b></div>
+            <div class="time-node">Maturity<br><b id="t_maturity"></b></div>
+        </div>
+
+        <div class="result-panel">
+            <div class="grid">
+                <div>
+                    <label>指標性累計利息 (參考)</label>
+                    <h2 id="accruedInt" style="color: var(--success-color); margin: 5px 0;">$0.00</h2>
+                </div>
+                <div>
+                    <label>預計年化收益</label>
+                    <h2 id="displayRate" style="color: var(--primary-color); margin: 5px 0;">0%</h2>
+                </div>
+            </div>
+            <p style="font-size: 0.7rem; color: #999;">* 以上利息按 Actual/365 簡易計算法估算，實際派息以發行商結算為準。</p>
+        </div>
+
+        <div id="qrcode"></div>
+    </div>
+</div>
+
+<script>
+    function updateDashboard() {
+        document.getElementById('dashboard').style.display = 'block';
+        
+        // 1. 處理股票標籤
+        const stocks = document.getElementById('stocks').value.split(',');
+        const stockListDiv = document.getElementById('stockList');
+        stockListDiv.innerHTML = '';
+        stocks.forEach(s => {
+            if(s.trim()) stockListDiv.innerHTML += `<span class="stock-tag">${s.trim().toUpperCase()}</span>`;
+        });
+
+        // 2. 更新日期顯示
+        document.getElementById('t_trade').innerText = document.getElementById('tradeDate').value;
+        document.getElementById('t_issue').innerText = document.getElementById('issueDate').value;
+        document.getElementById('t_fixing').innerText = document.getElementById('fixingDate').value;
+        document.getElementById('t_maturity').innerText = document.getElementById('maturityDate').value;
+
+        // 3. 指標性利息計算
+        const principal = parseFloat(document.getElementById('principal').value);
+        const rate = parseFloat(document.getElementById('annualRate').value) / 100;
+        const issueDate = new Date(document.getElementById('issueDate').value);
+        const today = new Date();
+        
+        if (!isNaN(issueDate)) {
+            const diffDays = Math.max(0, Math.ceil((today - issueDate) / (1000 * 60 * 60 * 24)));
+            const estInterest = principal * rate * (diffDays / 365);
+            document.getElementById('accruedInt').innerText = `$${estInterest.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            document.getElementById('displayRate').innerText = (rate * 100).toFixed(2) + '% p.a.';
+        }
+
+        // 4. 生成 QR Code (用於分享予客戶)
+        const qrContainer = document.getElementById('qrcode');
+        qrContainer.innerHTML = '<label>客戶分享 QR Code</label>';
+        const qr = qrcode(0, 'M');
+        qr.addData(`ELI: ${stocks.join('/')} | Rate: ${rate*100}% | Maturity: ${document.getElementById('maturityDate').value}`);
+        qr.make();
+        qrContainer.innerHTML += qr.createImgTag(5);
+        
+        // 5. 這裡可以加入你原本的 Google Drive 儲存 Logic
+        console.log("Saving to Google Drive...");
+    }
+
+    // 初始化日期為今日
+    document.getElementById('tradeDate').valueAsDate = new Date();
+</script>
+
+</body>
+</html>
             </select>
             <button onclick="addEntry()" style="background: #34A853;">儲存並同步到雲端</button>
         </div>
