@@ -3,37 +3,141 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ELI 同步管理系統</title>
+  <title>ELI 管理平台 - 帳號同步版</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" onload="initClient()" async defer></script>
   <style>
     :root {
-      --color-primary: #0b4a8b; --color-success: #18794e; --color-bg: #f0f4f9;
-      --color-card: #ffffff; --color-text: #1a1c1e; --radius: 16px;
+      --color-primary: #0b4a8b; --color-bg: #f5f7fb; --radius: 16px;
     }
-    body { margin: 0; background: var(--color-bg); font-family: 'Noto Sans TC', sans-serif; color: var(--color-text); }
+    body { margin: 0; background: var(--color-bg); font-family: 'Noto Sans TC', sans-serif; }
     
-    /* 登入頁面 */
+    /* 1. 登入介面樣式 */
     #login-screen { 
       display: flex; flex-direction: column; align-items: center; justify-content: center; 
-      height: 100vh; padding: 20px; text-align: center;
+      height: 100vh; text-align: center; padding: 20px;
     }
-    .login-btn { 
-      background: white; color: #444; border: 1px solid #ddd; padding: 12px 24px; 
-      border-radius: 24px; font-weight: 700; display: flex; align-items: center; gap: 10px; cursor: pointer;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    .login-card { background: white; padding: 40px 20px; border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 350px; }
+    .google-btn { 
+      background: #4285F4; color: white; border: none; padding: 14px 24px; 
+      border-radius: 25px; font-weight: 700; font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
     }
 
-    /* 主程式介面 (預設隱藏) */
-    #main-app { display: none; padding: 15px; padding-bottom: 80px; }
+    /* 2. 主程式介面 (登入前隱藏) */
+    #main-app { display: none; max-width: 460px; margin: 0 auto; padding: 20px; }
     
-    /* 修正排版：手機端一律使用單欄或比例分配 */
-    .top-status { 
-      background: var(--color-primary); color: white; padding: 12px 15px; 
-      border-radius: 12px; margin-bottom: 15px; font-size: 0.85rem; display: flex; justify-content: space-between;
+    /* 修正排版：使用 Row 佈局並支援手機自動換行 */
+    .card { background: white; border-radius: var(--radius); padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 15px; }
+    .row > div { flex: 1; min-width: 140px; } /* 確保手機端寬度不夠時自動換行 */
+    
+    .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px; }
+    label { font-size: 0.85rem; font-weight: 700; color: var(--color-primary); }
+    input, select { height: 48px; border-radius: 12px; border: 1.5px solid #eee; padding: 0 12px; font-size: 1rem; width: 100%; box-sizing: border-box; }
+    
+    .status-bar { background: var(--color-primary); color: white; padding: 10px 15px; border-radius: 10px; margin-bottom: 20px; font-size: 0.8rem; display: flex; justify-content: space-between; }
+    .btn-sync { width: 100%; padding: 16px; background: var(--color-primary); color: white; border: none; border-radius: 14px; font-weight: 700; font-size: 1rem; }
+  </style>
+</head>
+<body>
+
+  <div id="login-screen">
+    <div class="login-card">
+      <div style="font-size: 3rem; margin-bottom: 10px;">📊</div>
+      <h2 style="margin-bottom: 5px;">ELI 管理平台</h2>
+      <p style="color: #666; margin-bottom: 30px; font-size: 0.9rem;">請登入以同步 Google Drive 資料</p>
+      <button class="google-btn" onclick="handleAuthClick()">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" width="18" style="background:white; border-radius:50%; padding:2px;">
+        使用 Google 帳號登入
+      </button>
+      <div id="auth-status" style="margin-top: 15px; font-size: 0.8rem; color: #999;">等待授權...</div>
+    </div>
+  </div>
+
+  <div id="main-app">
+    <div class="status-bar">
+      <span>已連線：<b id="user-display">User</b></span>
+      <span id="sync-indicator">同步中...</span>
+    </div>
+
+    <section class="card">
+      <h3 style="margin-top:0; color:var(--color-primary)">1. 產品資料輸入</h3>
+      <div class="input-group">
+        <label>掛鉤股票 (最多4隻)</label>
+        <input type="text" id="tickers" placeholder="例如: 700 HK, NVDA US">
+      </div>
+      <div class="row">
+        <div class="input-group">
+          <label>投資金額</label>
+          <input type="number" id="principal" value="1000000">
+        </div>
+        <div class="input-group">
+          <label>年化利率 (%)</label>
+          <input type="number" id="coupon" value="15.5">
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3 style="margin-top:0; color:var(--color-primary)">2. 關鍵日期設定</h3>
+      <div class="row">
+        <div class="input-group"><label>Trade Date</label><input type="date" id="t_date"></div>
+        <div class="input-group"><label>Issue Date</label><input type="date" id="i_date"></div>
+      </div>
+      <div class="row">
+        <div class="input-group"><label>Fixing Day</label><input type="date" id="f_date"></div>
+        <div class="input-group"><label>Maturity Date</label><input type="date" id="m_date"></div>
+      </div>
+      <button class="btn-sync" onclick="saveData()">即時更新數據 & 儲存</button>
+    </section>
+  </div>
+
+  <script>
+    let tokenClient;
+    let accessToken = null;
+
+    // 1. 初始化 Google SDK (使用你 index.txt 的邏輯)
+    function initClient() {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        [span_6](start_span)client_id: '1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com', // 你的 Client ID[span_6](end_span)
+        scope: 'https://www.googleapis.com/auth/drive.appdata', 
+        callback: (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            [span_7](start_span)accessToken = tokenResponse.access_token;[span_7](end_span)
+            showApp(); // 登入成功後顯示主介面
+          }
+        },
+      });
     }
 
-    .card { background: var(--color-card); border-radius: var(--radius); padding: 18px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    .section-title { font-weight: 900; font-size: 1.15rem; margin-bottom: 15px; color: var(--color-primary); }
+    function handleAuthClick() {
+      [span_8](start_span)tokenClient.requestAccessToken();[span_8](end_span)
+    }
+
+    // 2. 顯示主介面並隱藏登入頁
+    function showApp() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('main-app').style.display = 'block';
+      document.getElementById('sync-indicator').innerText = "雲端同步已就緒";
+      // 可以在這裡呼叫函數去 fetch Google Drive 的資料
+    }
+
+    // 3. 儲存資料 (預留呼叫 Drive API 的位置)
+    function saveData() {
+      if (!accessToken) {
+        alert("請先登入！");
+        return;
+      }
+      console.log("使用 Token 儲存資料中: ", accessToken);
+      alert("資料已準備同步至 Google Drive App Data Folder！");
+    }
+
+    // 初始化今日日期
+    document.getElementById('t_date').value = new Date().toISOString().split('T')[0];
+  </script>
+</body>
+</html>
 
     /* 表單佈局優化：解決擠擁問題 */
     .form-group { margin-bottom: 15px; }
