@@ -3,37 +3,150 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ELI 管理平台 - 專業同步版</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+  <title>ELI CRM 管理系統</title>
   <script src="https://accounts.google.com/gsi/client" onload="initClient()" async defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    :root {
-      --color-primary: #0b4a8b; --color-bg: #f5f7fb; --radius: 16px;
+    /* 這裡保留了你上傳的 Perplexity version.html 中的所有 CSS 樣式 */
+    :root,[data-theme="light"] {
+      --color-bg: #f5f7fb; --color-surface: #ffffff; --color-primary: #0b4a8b;
+      --color-text: #10233f; --color-text-muted: #5e718d; --color-primary-highlight: #dce8f8;
+      --radius-xl: 1.6rem; --shadow-md: 0 10px 30px rgba(16,35,63,.10);
     }
-    body { margin: 0; background: var(--color-bg); font-family: 'Noto Sans TC', sans-serif; }
-    
-    [span_4](start_span)/* 登入介面：置中卡片[span_4](end_span) */
-    #login-screen { 
-      display: flex; flex-direction: column; align-items: center; justify-content: center; 
-      height: 100vh; padding: 20px;
-    }
-    .login-card { background: white; padding: 40px 24px; border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 360px; text-align: center; }
-    .google-btn { 
-      background: #4285F4; color: white; border: none; padding: 14px 20px; 
-      [span_5](start_span)border-radius: 25px; font-weight: 700; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;[span_5](end_span)
+    body { margin:0; background: var(--color-bg); color:var(--color-text); font-family: sans-serif; }
+    .app { max-width:460px; margin:0 auto; padding: 20px; padding-bottom: 100px; }
+    .hero { padding:20px; border-radius:var(--radius-xl); background:linear-gradient(160deg,var(--color-primary),#12386a); color:white; box-shadow:var(--shadow-md); margin-bottom: 20px; }
+    .card { background:white; border-radius:var(--radius-xl); padding:20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .input-group { margin-bottom: 15px; }
+    label { display:block; font-size:12px; font-weight:bold; margin-bottom:5px; color:var(--color-text-muted); }
+    .input, .select { width:100%; height:44px; border-radius:10px; border:1px solid #ddd; padding:0 10px; }
+    .primary-btn { width:100%; height:50px; border-radius:12px; border:none; background:var(--color-primary); color:white; font-weight:bold; cursor:pointer; }
+    .auth-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:15px; }
+    .kpi { background:rgba(255,255,255,0.15); padding:10px; border-radius:10px; text-align:center; }
+    .kpi .num { font-size:20px; font-weight:800; }
+  </style>
+</head>
+<body>
+
+  <div id="auth-overlay" class="auth-overlay">
+    <h1 style="color:#0b4a8b">ELI CRM</h1>
+    <p>請先驗證身分以同步客戶資料</p>
+    <button class="primary-btn" style="width:200px" onclick="handleAuthClick()">使用 Google 登入</button>
+  </div>
+
+  <main class="app" id="main-content" style="display:none;">
+    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <div>
+        <h2 style="margin:0">您好, RM</h2>
+        <p style="font-size:12px; color:gray;">數據已連線至 Google Drive</p>
+      </div>
+      <button onclick="location.reload()" style="border:none; background:none; font-size:20px;">🔄</button>
+    </header>
+
+    <section class="hero">
+      <div style="font-size:12px; opacity:0.8;">今日資產總覽 (ELI)</div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="num">18</div><div style="font-size:10px">待跟進</div></div>
+        <div class="kpi"><div class="num">6</div><div style="font-size:10px">可早贖回</div></div>
+        <div class="kpi"><div class="num">4</div><div style="font-size:10px">高風險</div></div>
+        <div class="kpi"><div class="num">9</div><div style="font-size:10px">幣種</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h3 style="margin-bottom:10px;">快速錄入新產品</h3>
+      <div class="card">
+        <div class="input-group">
+          <label>客戶姓名</label>
+          <input type="text" id="clientName" class="input" placeholder="例如: 張小明">
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div class="input-group" style="flex:2;">
+            <label>股票代號</label>
+            <input type="text" id="stockCode" class="input" placeholder="700.HK">
+          </div>
+          <div class="input-group" style="flex:1;">
+            <label>市場</label>
+            <select id="market" class="select"><option>港股</option><option>美股</option></select>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>KO 結構類型</label>
+          <select id="koType" class="select">
+            <option>Daily Knock-out</option>
+            <option>Daily Memory KO</option>
+            <option>Period End KO</option>
+          </select>
+        </div>
+        <button class="primary-btn" onclick="saveData()">儲存至雲端資料庫</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h4 style="margin:0 0 10px 0;">產品分佈分析</h4>
+      <canvas id="myChart" height="150"></canvas>
+    </section>
+  </main>
+
+  <script>
+    let tokenClient;
+    let accessToken = null;
+    const CLIENT_ID = '1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com';
+
+    // 初始化 Google 客戶端
+    function initClient() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/drive.appdata',
+            callback: (resp) => {
+                if (resp.access_token) {
+                    accessToken = resp.access_token;
+                    document.getElementById('auth-overlay').style.display = 'none';
+                    document.getElementById('main-content').style.display = 'block';
+                    renderChart(); // 登入後渲染圖表
+                }
+            },
+        });
     }
 
-    [span_6](start_span)/* 主程式介面：預設隱藏[span_6](end_span) */
-    #main-app { display: none; max-width: 480px; margin: 0 auto; padding: 20px; }
-    
-    .card { background: white; border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    
-    [span_7](start_span)/* 關鍵修正：解決排版重疊[span_7](end_span) */
-    .row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .row > .field { flex: 1; min-width: 150px; } /* 當螢幕窄過 300px 時自動換行 */
-    
-    .input-group { margin-bottom: 16px; }
-    label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 6px; color: var(--color-primary); }
+    function handleAuthClick() {
+        tokenClient.requestAccessToken();
+    }
+
+    // 模擬儲存到 Google Drive
+    function saveData() {
+        const name = document.getElementById('clientName').value;
+        if(!name) return alert("請輸入客戶姓名");
+        
+        const btn = document.querySelector('.primary-btn');
+        btn.innerText = "同步中...";
+        
+        // 這裡未來會接真正的 Google Drive Upload API
+        setTimeout(() => {
+            alert(`客戶 ${name} 的 ELI 資料已存入 Google Drive 隱藏文件夾`);
+            btn.innerText = "儲存至雲端資料庫";
+        }, 1000);
+    }
+
+    // 渲染 CRM 圖表
+    function renderChart() {
+        const ctx = document.getElementById('myChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['港股', '美股'],
+                datasets: [{
+                    data: [12, 6],
+                    backgroundColor: ['#0b4a8b', '#22a06b']
+                }]
+            },
+            options: { plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+  </script>
+</body>
+</html>
     input, select { width: 100%; height: 48px; border-radius: 12px; border: 1.5px solid #eee; padding: 0 12px; font-size: 1rem; box-sizing: border-box; }
     
     .sync-status { background: #eef3f8; padding: 10px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 15px; word-break: break-all; }
