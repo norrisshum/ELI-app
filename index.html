@@ -1,318 +1,449 @@
 <!DOCTYPE html>
-<html lang="zh-Hant" data-theme="light">
+<html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>ELI CRM 管理平台</title>
-    <script src="https://accounts.google.com/gsi/client" onload="initClient()" async defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root,[data-theme="light"] {
-            --color-bg: #f5f7fb; --color-surface: #ffffff; --color-primary: #0b4a8b;
-            --color-text: #10233f; --color-text-muted: #5e718d; --radius-xl: 1.6rem;
-            --shadow-md: 0 10px 30px rgba(16,35,63,.10);
-        }
-        body { margin:0; background: var(--color-bg); color:var(--color-text); font-family: -apple-system, sans-serif; }
-        .app { max-width:460px; margin:0 auto; padding: 20px; }
-        .hero { padding:20px; border-radius:var(--radius-xl); background:linear-gradient(160deg,var(--color-primary),#12386a); color:white; box-shadow:var(--shadow-md); margin-bottom: 20px; }
-        .card { background:white; border-radius:var(--radius-xl); padding:20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .input-group { margin-bottom: 12px; }
-        label { display:block; font-size:12px; font-weight:bold; margin-bottom:5px; color:var(--color-text-muted); }
-        input, select { width:100%; height:44px; border-radius:10px; border:1px solid #ddd; padding:0 10px; box-sizing: border-box; font-size:16px; }
-        .primary-btn { width:100%; height:50px; border-radius:12px; border:none; background:var(--color-primary); color:white; font-weight:bold; cursor:pointer; }
-        .auth-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-        .kpi-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:15px; }
-        .kpi { background:rgba(255,255,255,0.15); padding:10px; border-radius:10px; text-align:center; }
-        .kpi .num { font-size:22px; font-weight:800; }
-    </style>
-</head>
-<body>
-
-    <div id="auth-overlay" class="auth-overlay">
-        <h1 style="color:#0b4a8b">ELI CRM</h1>
-        <p>請先驗證身分以同步數據</p>
-        <button class="primary-btn" style="width:200px" onclick="handleAuthClick()">使用 Google 登入</button>
-    </div>
-
-    <main class="app" id="main-content" style="display:none;">
-        <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <div>
-                <h2 style="margin:0">您好, RM</h2>
-                <p id="sync-status" style="font-size:12px; color:gray;">正在初始化雲端資料...</p>
-            </div>
-            <button onclick="loadFromDrive()" style="border:none; background:none; font-size:20px;">🔄</button>
-        </header>
-
-        <section class="hero">
-            <div style="font-size:12px; opacity:0.8;">今日資產總覽 (ELI)</div>
-            <div class="kpi-grid">
-                <div class="kpi"><div class="num" id="kpi-total">0</div><div style="font-size:10px">待跟進</div></div>
-                <div class="kpi"><div class="num" id="kpi-ko">0</div><div style="font-size:10px">早贖回提醒</div></div>
-                <div class="kpi"><div class="num" id="kpi-ki">0</div><div style="font-size:10px">高風險 (KI)</div></div>
-                <div class="kpi"><div class="num">9</div><div style="font-size:10px">覆蓋幣種</div></div>
-            </div>
-        </section>
-
-        <section class="card">
-            <h3 style="margin:0 0 15px 0;">快速錄入新 ELI</h3>
-            <div class="input-group"><label>客戶姓名</label><input type="text" id="clientName"></div>
-            <div style="display:flex; gap:10px;">
-                <div class="input-group" style="flex:2;"><label>股票代號</label><input type="text" id="stockCode" placeholder="700.HK"></div>
-                <div class="input-group" style="flex:1;"><label>市場</label><select id="market"><option>HK</option><option>US</option></select></div>
-            </div>
-            <div class="input-group">
-                <label>KO 結構</label>
-                <select id="koType">
-                    <option value="Daily">Daily</option>
-                    <option value="Daily Memory">Daily Memory</option>
-                    <option value="Period End">Period End</option>
-                </select>
-            </div>
-            <button class="primary-btn" onclick="saveToDrive()">儲存至 Google Drive</button>
-        </section>
-    </main>
-
-    <script>
-        let tokenClient;
-        let accessToken = null;
-        let eliData = { products: [] };
-        const CLIENT_ID = '1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com';
-
-        function initClient() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
-                callback: (resp) => {
-                    if (resp.access_token) {
-                        accessToken = resp.access_token;
-                        document.getElementById('auth-overlay').style.display = 'none';
-                        document.getElementById('main-content').style.display = 'block';
-                        loadFromDrive(); // 登入後自動加載資料
-                    }
-                },
-            });
-        }
-
-        function handleAuthClick() { tokenClient.requestAccessToken(); }
-
-        // 模擬從 Google Drive 讀取 (實際 API 串接需使用 fetch)
-        async function loadFromDrive() {
-            document.getElementById('sync-status').innerText = "雲端同步中...";
-            // 此處應透過 Google Drive API 搜尋 eli_config.json
-            setTimeout(() => {
-                document.getElementById('sync-status').innerText = "數據已同步: " + new Date().toLocaleTimeString();
-                updateKPI();
-            }, 1000);
-        }
-
-        function saveData() {
-            const newProduct = {
-                client_name: document.getElementById('clientName').value,
-                stock: document.getElementById('stockCode').value,
-                market: document.getElementById('market').value,
-                ko_type: document.getElementById('koType').value
-            };
-            eliData.products.push(newProduct);
-            updateKPI();
-            alert("儲存成功！資料將同步至 Google Drive");
-        }
-
-        function updateKPI() {
-            document.getElementById('kpi-total').innerText = eliData.products.length;
-        }
-    </script>
-</body>
-</html>
-
-  <main class="app" id="main-content" style="display:none;">
-    <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-      <div>
-        <h2 style="margin:0">您好, RM</h2>
-        <p style="font-size:12px; color:gray;">數據已連線至 Google Drive</p>
-      </div>
-      <button onclick="location.reload()" style="border:none; background:none; font-size:20px;">🔄</button>
-    </header>
-
-    <section class="hero">
-      <div style="font-size:12px; opacity:0.8;">今日資產總覽 (ELI)</div>
-      <div class="kpi-grid">
-        <div class="kpi"><div class="num">18</div><div style="font-size:10px">待跟進</div></div>
-        <div class="kpi"><div class="num">6</div><div style="font-size:10px">可早贖回</div></div>
-        <div class="kpi"><div class="num">4</div><div style="font-size:10px">高風險</div></div>
-        <div class="kpi"><div class="num">9</div><div style="font-size:10px">幣種</div></div>
-      </div>
-    </section>
-
-    <section>
-      <h3 style="margin-bottom:10px;">快速錄入新產品</h3>
-      <div class="card">
-        <div class="input-group">
-          <label>客戶姓名</label>
-          <input type="text" id="clientName" class="input" placeholder="例如: 張小明">
-        </div>
-        <div style="display:flex; gap:10px;">
-          <div class="input-group" style="flex:2;">
-            <label>股票代號</label>
-            <input type="text" id="stockCode" class="input" placeholder="700.HK">
-          </div>
-          <div class="input-group" style="flex:1;">
-            <label>市場</label>
-            <select id="market" class="select"><option>港股</option><option>美股</option></select>
-          </div>
-        </div>
-        <div class="input-group">
-          <label>KO 結構類型</label>
-          <select id="koType" class="select">
-            <option>Daily Knock-out</option>
-            <option>Daily Memory KO</option>
-            <option>Period End KO</option>
-          </select>
-        </div>
-        <button class="primary-btn" onclick="saveData()">儲存至雲端資料庫</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <h4 style="margin:0 0 10px 0;">產品分佈分析</h4>
-      <canvas id="myChart" height="150"></canvas>
-    </section>
-  </main>
-
-  <script>
-    let tokenClient;
-    let accessToken = null;
-    const CLIENT_ID = '1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com';
-
-    // 初始化 Google 客戶端
-    function initClient() {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CLIENT_ID,
-            scope: 'https://www.googleapis.com/auth/drive.appdata',
-            callback: (resp) => {
-                if (resp.access_token) {
-                    accessToken = resp.access_token;
-                    document.getElementById('auth-overlay').style.display = 'none';
-                    document.getElementById('main-content').style.display = 'block';
-                    renderChart(); // 登入後渲染圖表
-                }
-            },
-        });
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ELI 管理平台</title>
+  <script src="https://apis.google.com/js/api.js" async defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background:#0f172a; color:#e2e8f0; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 20px; }
+    .card { background:#111827; border:1px solid #334155; border-radius:16px; padding:16px; margin-bottom:16px; }
+    button {
+      background:#2563eb; color:white; border:none; padding:10px 14px; border-radius:10px;
+      cursor:pointer; margin-right:8px; margin-bottom:8px;
     }
-
-    function handleAuthClick() {
-        tokenClient.requestAccessToken();
+    button.secondary { background:#334155; }
+    button.danger { background:#dc2626; }
+    input, select, textarea {
+      width:100%; box-sizing:border-box; padding:10px 12px; border-radius:10px;
+      border:1px solid #334155; background:#0b1220; color:#e2e8f0; margin-top:6px;
     }
-
-    // 模擬儲存到 Google Drive
-    function saveData() {
-        const name = document.getElementById('clientName').value;
-        if(!name) return alert("請輸入客戶姓名");
-        
-        const btn = document.querySelector('.primary-btn');
-        btn.innerText = "同步中...";
-        
-        // 這裡未來會接真正的 Google Drive Upload API
-        setTimeout(() => {
-            alert(`客戶 ${name} 的 ELI 資料已存入 Google Drive 隱藏文件夾`);
-            btn.innerText = "儲存至雲端資料庫";
-        }, 1000);
-    }
-
-    // 渲染 CRM 圖表
-    function renderChart() {
-        const ctx = document.getElementById('myChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['港股', '美股'],
-                datasets: [{
-                    data: [12, 6],
-                    backgroundColor: ['#0b4a8b', '#22a06b']
-                }]
-            },
-            options: { plugins: { legend: { position: 'bottom' } } }
-        });
-    }
-  </script>
-</body>
-</html>
-    input, select { width: 100%; height: 48px; border-radius: 12px; border: 1.5px solid #eee; padding: 0 12px; font-size: 1rem; box-sizing: border-box; }
-    
-    .sync-status { background: #eef3f8; padding: 10px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 15px; word-break: break-all; }
+    label { display:block; margin-top:12px; font-size:14px; color:#cbd5e1; }
+    table { width:100%; border-collapse: collapse; margin-top:12px; }
+    th, td { border-bottom:1px solid #334155; padding:10px 8px; text-align:left; vertical-align: top; font-size:14px; }
+    th { color:#93c5fd; }
+    .row { display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; }
+    @media (max-width: 700px){ .row { grid-template-columns: 1fr; } }
+    .muted { color:#94a3b8; font-size:13px; }
+    .ok { color:#4ade80; }
+    .warn { color:#fbbf24; }
+    .bad { color:#f87171; }
+    pre { white-space: pre-wrap; word-break: break-word; }
   </style>
 </head>
 <body>
+  <div class="wrap">
+    <h1>ELI 管理平台</h1>
+    <p class="muted">Google Drive 作個人資料庫版本</p>
 
-  <div id="login-screen">
-    <div class="login-card">
-      <h2 style="margin-bottom: 10px;">ELI 管理平台</h2>
-      <p style="color: #666; margin-bottom: 30px; font-size: 0.9rem;">請使用 Google 帳號登入以同步雲端資料</p>
-      <button class="google-btn" onclick="handleAuthClick()">使用 Google 帳號登入</button>
-    </div>
-  </div>
-
-  <div id="main-app">
-    <div class="sync-status" id="status">已連接 Google Drive</div>
-    
     <div class="card">
-      <h3 style="margin-top:0">1. 產品資料輸入</h3>
-      <div class="input-group">
-        <label>掛鉤股票 (最多4隻)</label>
-        <input type="text" id="tickers" placeholder="例如: 700 HK, NVDA US">
+      <div>
+        <button id="btnAuth" onclick="handleAuthClick()">Google 登入</button>
+        <button id="btnSignout" class="secondary" onclick="handleSignoutClick()" style="display:none;">登出</button>
+        <button id="btnLoad" class="secondary" onclick="loadEliData()" style="display:none;">讀取 ELI 資料</button>
+        <button id="btnSave" class="secondary" onclick="saveCurrentData()" style="display:none;">儲存到 Google Drive</button>
       </div>
-      <div class="row">
-        <div class="field"><label>本金</label><input type="number" id="p" value="1000000"></div>
-        <div class="field"><label>利率 (%)</label><input type="number" id="r" value="15.5"></div>
-      </div>
+      <p id="status" class="muted">未登入</p>
+      <p id="fileInfo" class="muted"></p>
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">2. 關鍵日期設定</h3>
+      <h2>新增 / 編輯 ELI</h2>
+
       <div class="row">
-        <div class="field"><label>Trade Date</label><input type="date" id="d1"></div>
-        <div class="field"><label>Issue Date</label><input type="date" id="d2"></div>
+        <div>
+          <label>產品編號</label>
+          <input id="id" placeholder="ELI-HK-24018">
+        </div>
+        <div>
+          <label>市場</label>
+          <select id="market">
+            <option>HK</option>
+            <option>US</option>
+          </select>
+        </div>
       </div>
-      <div style="margin-top:12px;" class="row">
-        <div class="field"><label>Fixing Day</label><input type="date" id="d3"></div>
-        <div class="field"><label>Maturity Date</label><input type="date" id="d4"></div>
+
+      <div class="row">
+        <div>
+          <label>相關股票</label>
+          <input id="underlying" placeholder="700 HK / AAPL US">
+        </div>
+        <div>
+          <label>貨幣</label>
+          <select id="currency">
+            <option>HKD</option><option>USD</option><option>CNY</option><option>EUR</option>
+            <option>GBP</option><option>AUD</option><option>NZD</option><option>CAD</option><option>JPY</option>
+          </select>
+        </div>
       </div>
-      <button style="width:100%; margin-top:20px; background:var(--color-primary); color:white; border:none; padding:15px; border-radius:12px; font-weight:700;" onclick="saveToDrive()">儲存至 Google Drive</button>
+
+      <div class="row">
+        <div>
+          <label>KO 類型</label>
+          <select id="ko_type">
+            <option value="daily">Daily</option>
+            <option value="daily_memory">Daily Memory</option>
+            <option value="period_end">Period End</option>
+          </select>
+        </div>
+        <div>
+          <label>KI 類型</label>
+          <select id="ki_type">
+            <option value="EKI">EKI</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>行使價</label>
+          <input id="strike" type="number" step="0.01" placeholder="388">
+        </div>
+        <div>
+          <label>KO 水平</label>
+          <input id="ko_level" type="number" step="0.01" placeholder="405">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>KI 水平</label>
+          <input id="ki_level" type="number" step="0.01" placeholder="320">
+        </div>
+        <div>
+          <label>最新收市價</label>
+          <input id="latest_close" type="number" step="0.01" placeholder="406.2">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>觀察日</label>
+          <input id="observation_date" type="date">
+        </div>
+        <div>
+          <label>到期日</label>
+          <input id="maturity_date" type="date">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>RM 本身</label>
+          <input id="rm_owner" placeholder="RM Chan">
+        </div>
+        <div>
+          <label>客戶姓名 / 代號</label>
+          <input id="client_name" placeholder="張客戶 / C001">
+        </div>
+      </div>
+
+      <label>備註</label>
+      <textarea id="notes" rows="3" placeholder="例如：接近 KO，需跟進"></textarea>
+
+      <div style="margin-top:14px;">
+        <button onclick="addProduct()">加入到本地列表</button>
+        <button class="secondary" onclick="clearForm()">清空表單</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>產品列表</h2>
+      <p class="muted">會自動計算 KO / KI 狀態</p>
+      <div id="summary" class="muted"></div>
+      <div id="tableWrap"></div>
+    </div>
+
+    <div class="card">
+      <h2>Debug</h2>
+      <pre id="debug"></pre>
     </div>
   </div>
 
   <script>
+    const CLIENT_ID = "YOUR_CLIENT_ID_HERE.apps.googleusercontent.com";
+    const DISCOVERY_DOC = "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest";
+    const SCOPES = "https://www.googleapis.com/auth/drive.file";
+
+    const ELI_FILENAME = "eli.json";
     let tokenClient;
-    [span_8](start_span)let accessToken = null;[span_8](end_span)
+    let gapiInited = false;
+    let gisInited = false;
+    let eliFileId = null;
+    let products = [];
 
-    [span_9](start_span)// 1. 初始化 Google 客戶端[span_9](end_span)
-    function initClient() {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        [span_10](start_span)client_id: '1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com',[span_10](end_span)
-        [span_11](start_span)scope: 'https://www.googleapis.com/auth/drive.appdata',[span_11](end_span)
-        callback: (tokenResponse) => {
-          if (tokenResponse && tokenResponse.access_token) {
-            [span_12](start_span)accessToken = tokenResponse.access_token;[span_12](end_span)
-            [span_13](start_span)document.getElementById('login-screen').style.display = 'none';[span_13](end_span)
-            [span_14](start_span)document.getElementById('main-app').style.display = 'block';[span_14](end_span)
-            [span_15](start_span)console.log("Token acquired:", accessToken);[span_15](end_span)
-          }
-        },
+    function setStatus(msg) {
+      document.getElementById("status").textContent = msg;
+    }
+
+    function setDebug(obj) {
+      document.getElementById("debug").textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+    }
+
+    function gapiLoaded() {
+      gapi.load("client", initializeGapiClient);
+    }
+
+    async function initializeGapiClient() {
+      await gapi.client.init({
+        discoveryDocs: [DISCOVERY_DOC]
       });
+      gapiInited = true;
+      maybeEnableButtons();
     }
 
-    [span_16](start_span)// 2. 觸發登入[span_16](end_span)
+    function gisLoaded() {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: 1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com,
+        scope: SCOPES,
+        callback: ""
+      });
+      gisInited = true;
+      maybeEnableButtons();
+    }
+
+    function maybeEnableButtons() {
+      if (gapiInited && gisInited) {
+        document.getElementById("btnAuth").disabled = false;
+      }
+    }
+
     function handleAuthClick() {
-      [span_17](start_span)tokenClient.requestAccessToken();[span_17](end_span)
+      tokenClient.callback = async (resp) => {
+        if (resp.error) {
+          setStatus("登入失敗");
+          setDebug(resp);
+          return;
+        }
+        document.getElementById("btnSignout").style.display = "inline-block";
+        document.getElementById("btnLoad").style.display = "inline-block";
+        document.getElementById("btnSave").style.display = "inline-block";
+        setStatus("已登入，開始搜尋 / 載入 Google Drive 檔案...");
+        await findOrCreateFile();
+      };
+
+      const token = gapi.client.getToken();
+      if (token === null) {
+        tokenClient.requestAccessToken({ prompt: "consent" });
+      } else {
+        tokenClient.requestAccessToken({ prompt: "" });
+      }
     }
 
-    [span_18](start_span)// 3. 預留儲存邏輯[span_18](end_span)
-    async function saveToDrive() {
-      console.log("準備同步至 Drive，使用 Token:", accessToken);
-      alert("資料已準備好上傳！");
+    function handleSignoutClick() {
+      const token = gapi.client.getToken();
+      if (token !== null) {
+        google.accounts.oauth2.revoke(token.access_token);
+        gapi.client.setToken("");
+      }
+      eliFileId = null;
+      products = [];
+      renderProducts();
+      document.getElementById("btnSignout").style.display = "none";
+      document.getElementById("btnLoad").style.display = "none";
+      document.getElementById("btnSave").style.display = "none";
+      setStatus("已登出");
+      document.getElementById("fileInfo").textContent = "";
+      setDebug("");
     }
-    
-    // 初始化今日日期
-    document.getElementById('d1').value = new Date().toISOString().split('T')[0];
+
+    async function findOrCreateFile() {
+      try {
+        const res = await gapi.client.drive.files.list({
+          q: `name='${ELI_FILENAME}' and trashed=false`,
+          fields: "files(id,name,mimeType,modifiedTime)"
+        });
+
+        const files = res.result.files || [];
+        if (files.length > 0) {
+          eliFileId = files[0].id;
+          document.getElementById("fileInfo").textContent = `已找到檔案：${files[0].name} (${eliFileId})`;
+          setStatus("已找到 eli.json，可以讀取");
+          await loadEliData();
+        } else {
+          const file = await gapi.client.drive.files.create({
+            resource: {
+              name: ELI_FILENAME,
+              mimeType: "application/json"
+            },
+            media: {
+              mimeType: "application/json",
+              body: JSON.stringify({ products: [] }, null, 2)
+            },
+            fields: "id,name"
+          });
+          eliFileId = file.result.id;
+          document.getElementById("fileInfo").textContent = `已建立新檔案：${file.result.name} (${eliFileId})`;
+          products = [];
+          renderProducts();
+          setStatus("已建立新 eli.json");
+        }
+      } catch (e) {
+        setStatus("找不到或建立檔案失敗");
+        setDebug(e);
+      }
+    }
+
+    async function loadEliData() {
+      if (!eliFileId) {
+        setStatus("未有 ELI 檔案 ID");
+        return;
+      }
+      try {
+        const res = await gapi.client.drive.files.get({
+          fileId: eliFileId,
+          alt: "media"
+        });
+
+        const text = res.body || "{}";
+        const data = JSON.parse(text);
+        products = Array.isArray(data.products) ? data.products : [];
+        renderProducts();
+        setStatus(`已載入 ${products.length} 筆產品`);
+        setDebug(data);
+      } catch (e) {
+        setStatus("讀檔失敗");
+        setDebug(e);
+      }
+    }
+
+    async function saveEliData() {
+      if (!eliFileId) {
+        setStatus("未有檔案 ID，先登入並建立 / 選擇檔案");
+        return;
+      }
+      try {
+        const content = JSON.stringify({ products }, null, 2);
+        await gapi.client.drive.files.update({
+          fileId: eliFileId,
+          media: {
+            mimeType: "application/json",
+            body: content
+          }
+        });
+        setStatus(`已儲存 ${products.length} 筆產品到 Google Drive`);
+        setDebug({ saved: true, count: products.length, fileId: eliFileId });
+      } catch (e) {
+        setStatus("寫檔失敗");
+        setDebug(e);
+      }
+    }
+
+    function addProduct() {
+      const p = {
+        id: document.getElementById("id").value.trim(),
+        market: document.getElementById("market").value,
+        underlying: document.getElementById("underlying").value.trim(),
+        currency: document.getElementById("currency").value,
+        ko_type: document.getElementById("ko_type").value,
+        ki_type: document.getElementById("ki_type").value,
+        strike: num("strike"),
+        ko_level: num("ko_level"),
+        ki_level: num("ki_level"),
+        latest_close: num("latest_close"),
+        observation_date: document.getElementById("observation_date").value,
+        maturity_date: document.getElementById("maturity_date").value,
+        rm_owner: document.getElementById("rm_owner").value.trim(),
+        client_name: document.getElementById("client_name").value.trim(),
+        notes: document.getElementById("notes").value.trim()
+      };
+
+      if (!p.id || !p.underlying) {
+        alert("請至少輸入產品編號同相關股票");
+        return;
+      }
+
+      const idx = products.findIndex(x => x.id === p.id);
+      if (idx >= 0) products[idx] = p;
+      else products.unshift(p);
+
+      renderProducts();
+      setStatus(`已加入 / 更新產品：${p.id}`);
+    }
+
+    function num(id) {
+      const v = parseFloat(document.getElementById(id).value);
+      return Number.isFinite(v) ? v : null;
+    }
+
+    function clearForm() {
+      ["id","underlying","strike","ko_level","ki_level","latest_close","rm_owner","client_name","notes"].forEach(id => {
+        document.getElementById(id).value = "";
+      });
+      document.getElementById("market").value = "HK";
+      document.getElementById("currency").value = "HKD";
+      document.getElementById("ko_type").value = "daily";
+      document.getElementById("ki_type").value = "EKI";
+      document.getElementById("observation_date").value = "";
+      document.getElementById("maturity_date").value = "";
+    }
+
+    function calcStatus(p) {
+      if (p.latest_close == null || p.ko_level == null || p.ki_level == null) return { label: "未知", cls: "muted" };
+      const koPct = (p.latest_close / p.ko_level) * 100;
+      const kiPct = (p.latest_close / p.ki_level) * 100;
+      if (koPct >= 100) return { label: "可早贖回", cls: "ok" };
+      if (koPct >= 97) return { label: "接近 KO", cls: "warn" };
+      if (kiPct <= 105) return { label: "接近 KI", cls: "bad" };
+      return { label: "正常", cls: "muted" };
+    }
+
+    function renderProducts() {
+      const rows = products.map(p => {
+        const st = calcStatus(p);
+        return `
+          <tr>
+            <td>${escapeHtml(p.id || "")}</td>
+            <td>${escapeHtml(p.underlying || "")}</td>
+            <td>${escapeHtml(p.market || "")}</td>
+            <td>${escapeHtml(p.currency || "")}</td>
+            <td>${escapeHtml(p.ko_type || "")}</td>
+            <td>${escapeHtml(p.ki_type || "")}</td>
+            <td>${fmt(p.latest_close)}</td>
+            <td>${fmt(p.ko_level)}</td>
+            <td>${fmt(p.ki_level)}</td>
+            <td class="${st.cls}">${st.label}</td>
+          </tr>
+        `;
+      }).join("");
+
+      document.getElementById("summary").textContent = `總數：${products.length}`;
+      document.getElementById("tableWrap").innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>產品編號</th>
+              <th>相關股票</th>
+              <th>市場</th>
+              <th>貨幣</th>
+              <th>KO 類型</th>
+              <th>KI 類型</th>
+              <th>收市價</th>
+              <th>KO</th>
+              <th>KI</th>
+              <th>狀態</th>
+            </tr>
+          </thead>
+          <tbody>${rows || "<tr><td colspan='10' class='muted'>未有資料</td></tr>"}</tbody>
+        </table>
+      `;
+    }
+
+    function fmt(v) {
+      return (v === null || v === undefined || Number.isNaN(v)) ? "" : Number(v).toFixed(2);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
+    }
+
+    window.addEventListener("load", () => {
+      document.getElementById("btnAuth").disabled = true;
+      renderProducts();
+    });
   </script>
 </body>
 </html>
