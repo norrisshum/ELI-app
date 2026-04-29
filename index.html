@@ -3,447 +3,126 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ELI 管理平台</title>
+  <title>ELI RM 持倉版</title>
   <script src="https://apis.google.com/js/api.js" async defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; background:#0f172a; color:#e2e8f0; }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 20px; }
-    .card { background:#111827; border:1px solid #334155; border-radius:16px; padding:16px; margin-bottom:16px; }
-    button {
-      background:#2563eb; color:white; border:none; padding:10px 14px; border-radius:10px;
-      cursor:pointer; margin-right:8px; margin-bottom:8px;
-    }
-    button.secondary { background:#334155; }
-    button.danger { background:#dc2626; }
-    input, select, textarea {
-      width:100%; box-sizing:border-box; padding:10px 12px; border-radius:10px;
-      border:1px solid #334155; background:#0b1220; color:#e2e8f0; margin-top:6px;
-    }
-    label { display:block; margin-top:12px; font-size:14px; color:#cbd5e1; }
-    table { width:100%; border-collapse: collapse; margin-top:12px; }
-    th, td { border-bottom:1px solid #334155; padding:10px 8px; text-align:left; vertical-align: top; font-size:14px; }
-    th { color:#93c5fd; }
-    .row { display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; }
-    @media (max-width: 700px){ .row { grid-template-columns: 1fr; } }
-    .muted { color:#94a3b8; font-size:13px; }
-    .ok { color:#4ade80; }
-    .warn { color:#fbbf24; }
-    .bad { color:#f87171; }
-    pre { white-space: pre-wrap; word-break: break-word; }
+    :root{--bg:#0b1220;--card:#111827;--bd:#22314a;--txt:#e5eefc;--mut:#94a3b8;--pri:#3b82f6;--ok:#22c55e;--warn:#fbbf24;--bad:#f87171}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:linear-gradient(180deg,#08111f,#0b1220);color:var(--txt)}
+    .wrap{max-width:1280px;margin:0 auto;padding:16px} .top{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+    .brand h1{margin:0;font-size:22px}.brand p{margin:4px 0 0;color:var(--mut);font-size:13px}
+    .btn{background:var(--pri);color:#fff;border:none;border-radius:12px;padding:10px 14px;cursor:pointer;font-weight:600;margin-right:8px;margin-bottom:8px}
+    .btn.sec{background:#334155}.card{background:rgba(17,24,39,.92);border:1px solid var(--bd);border-radius:18px;padding:16px;margin-bottom:16px}
+    .grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px} @media(max-width:1100px){.grid{grid-template-columns:1fr}}
+    .row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px} @media(max-width:700px){.row{grid-template-columns:1fr}}
+    label{display:block;margin:10px 0 6px;color:#cbd5e1;font-size:13px} input,select,textarea{width:100%;background:#0b1220;color:var(--txt);border:1px solid #334155;border-radius:12px;padding:10px 12px;outline:none}
+    .mut{color:var(--mut);font-size:13px} .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:520px){.kpis{grid-template-columns:1fr}}
+    .kpi{background:#0f172a;border:1px solid var(--bd);border-radius:16px;padding:14px}.kpi .v{font-size:26px;font-weight:800;margin-top:6px}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+    .filters{display:flex;gap:8px;flex-wrap:wrap}.pill{border:1px solid var(--bd);background:#0c1527;color:#dbeafe;padding:8px 12px;border-radius:999px;cursor:pointer}.pill.active{background:rgba(59,130,246,.16);color:#bfdbfe;border-color:rgba(59,130,246,.45)}
+    .list{display:grid;gap:12px}.item{display:grid;grid-template-columns:1.8fr 1fr auto;gap:12px;align-items:center;background:#0f172a;border:1px solid var(--bd);border-radius:16px;padding:14px}@media(max-width:900px){.item{grid-template-columns:1fr}}
+    .item h3{margin:0 0 6px;font-size:18px}.meta{color:var(--mut);font-size:13px;line-height:1.55}.status{justify-self:end;text-align:right}@media(max-width:900px){.status{justify-self:start;text-align:left}}
+    .drawer{position:fixed;top:0;right:-100%;width:min(560px,100vw);height:100vh;background:#0b1220;border-left:1px solid #22314a;transition:.25s ease;overflow:auto;z-index:50;padding:16px}.drawer.open{right:0}
+    pre{white-space:pre-wrap;word-break:break-word;background:#08111f;border:1px solid #22314a;padding:12px;border-radius:12px}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>ELI 管理平台</h1>
-    <p class="muted">Google Drive 作個人資料庫版本</p>
-
-    <div class="card">
-      <div>
-        <button id="btnAuth" onclick="handleAuthClick()">Google 登入</button>
-        <button id="btnSignout" class="secondary" onclick="handleSignoutClick()" style="display:none;">登出</button>
-        <button id="btnLoad" class="secondary" onclick="loadEliData()" style="display:none;">讀取 ELI 資料</button>
-        <button id="btnSave" class="secondary" onclick="saveCurrentData()" style="display:none;">儲存到 Google Drive</button>
-      </div>
-      <p id="status" class="muted">未登入</p>
-      <p id="fileInfo" class="muted"></p>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><h1>ELI RM 持倉版</h1><p>一眼睇晒 RM 旗下 ELI 持倉、風險同條款</p></div>
+    <div>
+      <button id="btnAuth" class="btn" onclick="handleAuthClick()">Google 登入</button>
+      <button id="btnSignout" class="btn sec" onclick="handleSignoutClick()" style="display:none;">登出</button>
+      <button id="btnLoad" class="btn sec" onclick="loadEliData()" style="display:none;">讀取資料</button>
+      <button id="btnSave" class="btn sec" onclick="saveToDrive()" style="display:none;">儲存到 Drive</button>
     </div>
-
+  </div>
+  <div class="card"><div id="status" class="mut">未登入</div><div id="fileInfo" class="mut"></div></div>
+  <div class="kpis card">
+    <div class="kpi"><div class="mut">總持倉</div><div class="v" id="kpiTotal">0</div></div>
+    <div class="kpi"><div class="mut">可早贖回</div><div class="v ok" id="kpiKO">0</div></div>
+    <div class="kpi"><div class="mut">接近 KO</div><div class="v warn" id="kpiNearKO">0</div></div>
+    <div class="kpi"><div class="mut">接近 KI</div><div class="v bad" id="kpiNearKI">0</div></div>
+  </div>
+  <div class="grid">
     <div class="card">
-      <h2>新增 / 編輯 ELI</h2>
-
       <div class="row">
         <div>
-          <label>產品編號</label>
-          <input id="id" placeholder="ELI-HK-24018">
+          <h2 style="margin-top:0">篩選</h2>
+          <div class="filters">
+            <button class="pill active" data-filter="all" onclick="setFilter('all')">全部</button>
+            <button class="pill" data-filter="ko" onclick="setFilter('ko')">可早贖回</button>
+            <button class="pill" data-filter="near_ko" onclick="setFilter('near_ko')">接近 KO</button>
+            <button class="pill" data-filter="near_ki" onclick="setFilter('near_ki')">接近 KI</button>
+            <button class="pill" data-filter="normal" onclick="setFilter('normal')">正常</button>
+          </div>
         </div>
-        <div>
-          <label>市場</label>
-          <select id="market">
-            <option>HK</option>
-            <option>US</option>
-          </select>
-        </div>
+        <div><label>搜尋客戶 / 產品 / 股票</label><input id="searchBox" placeholder="輸入客戶、ELI 編號、ticker..." oninput="render()"></div>
       </div>
-
-      <div class="row">
-        <div>
-          <label>相關股票</label>
-          <input id="underlying" placeholder="700 HK / AAPL US">
-        </div>
-        <div>
-          <label>貨幣</label>
-          <select id="currency">
-            <option>HKD</option><option>USD</option><option>CNY</option><option>EUR</option>
-            <option>GBP</option><option>AUD</option><option>NZD</option><option>CAD</option><option>JPY</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>KO 類型</label>
-          <select id="ko_type">
-            <option value="daily">Daily</option>
-            <option value="daily_memory">Daily Memory</option>
-            <option value="period_end">Period End</option>
-          </select>
-        </div>
-        <div>
-          <label>KI 類型</label>
-          <select id="ki_type">
-            <option value="EKI">EKI</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>行使價</label>
-          <input id="strike" type="number" step="0.01" placeholder="388">
-        </div>
-        <div>
-          <label>KO 水平</label>
-          <input id="ko_level" type="number" step="0.01" placeholder="405">
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>KI 水平</label>
-          <input id="ki_level" type="number" step="0.01" placeholder="320">
-        </div>
-        <div>
-          <label>最新收市價</label>
-          <input id="latest_close" type="number" step="0.01" placeholder="406.2">
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>觀察日</label>
-          <input id="observation_date" type="date">
-        </div>
-        <div>
-          <label>到期日</label>
-          <input id="maturity_date" type="date">
-        </div>
-      </div>
-
-      <div class="row">
-        <div>
-          <label>RM 本身</label>
-          <input id="rm_owner" placeholder="RM Chan">
-        </div>
-        <div>
-          <label>客戶姓名 / 代號</label>
-          <input id="client_name" placeholder="張客戶 / C001">
-        </div>
-      </div>
-
-      <label>備註</label>
-      <textarea id="notes" rows="3" placeholder="例如：接近 KO，需跟進"></textarea>
-
-      <div style="margin-top:14px;">
-        <button onclick="addProduct()">加入到本地列表</button>
-        <button class="secondary" onclick="clearForm()">清空表單</button>
-      </div>
+      <div id="list" class="list" style="margin-top:14px"></div>
     </div>
-
     <div class="card">
-      <h2>產品列表</h2>
-      <p class="muted">會自動計算 KO / KI 狀態</p>
-      <div id="summary" class="muted"></div>
-      <div id="tableWrap"></div>
-    </div>
-
-    <div class="card">
-      <h2>Debug</h2>
+      <h2 style="margin-top:0">新增 / 編輯 ELI</h2>
+      <div class="row">
+        <div><label>產品編號</label><input id="id" placeholder="ELI-UBS-700-941-2026-05-06"></div>
+        <div><label>客戶</label><input id="client_name" placeholder="張客戶 / C001"></div>
+      </div>
+      <div class="row">
+        <div><label>RM</label><input id="rm_owner" placeholder="RM Chan"></div>
+        <div><label>Issuer</label><input id="issuer" placeholder="UBS"></div>
+      </div>
+      <div class="row">
+        <div><label>Currency</label><select id="currency"><option>HKD</option><option>USD</option><option>CNY</option><option>EUR</option><option>GBP</option><option>AUD</option><option>NZD</option><option>CAD</option><option>JPY</option></select></div>
+        <div><label>Tenor(月)</label><input id="tenor_months" type="number" step="1" placeholder="11"></div>
+      </div>
+      <div class="row">
+        <div><label>Coupon %</label><input id="coupon_pct" type="number" step="0.01" placeholder="6"></div>
+        <div><label>Fee %</label><input id="fee_pct" type="number" step="0.01" placeholder="2.57"></div>
+      </div>
+      <div class="row">
+        <div><label>Issue date</label><input id="issue_date" type="date"></div>
+        <div><label>Status</label><select id="status"><option value="normal">normal</option><option value="near_ko">near_ko</option><option value="ko">ko</option><option value="near_ki">near_ki</option></select></div>
+      </div>
+      <label>相關股票（逗號分隔）</label><textarea id="underlyings" rows="3" placeholder="700 HK, 941 HK"></textarea>
+      <label>備註</label><textarea id="notes" rows="2" placeholder="例如：MKO / Airbag NA"></textarea>
+      <button class="btn" onclick="saveFromForm()">加入 / 更新持倉</button><button class="btn sec" onclick="clearForm()">清空</button>
       <pre id="debug"></pre>
     </div>
   </div>
-
-  <script>
-    const CLIENT_ID = "YOUR_CLIENT_ID_HERE.apps.googleusercontent.com";
-    const DISCOVERY_DOC = "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest";
-    const SCOPES = "https://www.googleapis.com/auth/drive.file";
-
-    const ELI_FILENAME = "eli.json";
-    let tokenClient;
-    let gapiInited = false;
-    let gisInited = false;
-    let eliFileId = null;
-    let products = [];
-
-    function setStatus(msg) {
-      document.getElementById("status").textContent = msg;
-    }
-
-    function setDebug(obj) {
-      document.getElementById("debug").textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
-    }
-
-    function gapiLoaded() {
-      gapi.load("client", initializeGapiClient);
-    }
-
-    async function initializeGapiClient() {
-      await gapi.client.init({
-        discoveryDocs: [DISCOVERY_DOC]
-      });
-      gapiInited = true;
-      maybeEnableButtons();
-    }
-
-    function gisLoaded() {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: 1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com,
-        scope: SCOPES,
-        callback: ""
-      });
-      gisInited = true;
-      maybeEnableButtons();
-    }
-
-    function maybeEnableButtons() {
-      if (gapiInited && gisInited) {
-        document.getElementById("btnAuth").disabled = false;
-      }
-    }
-
-    function handleAuthClick() {
-      tokenClient.callback = async (resp) => {
-        if (resp.error) {
-          setStatus("登入失敗");
-          setDebug(resp);
-          return;
-        }
-        document.getElementById("btnSignout").style.display = "inline-block";
-        document.getElementById("btnLoad").style.display = "inline-block";
-        document.getElementById("btnSave").style.display = "inline-block";
-        setStatus("已登入，開始搜尋 / 載入 Google Drive 檔案...");
-        await findOrCreateFile();
-      };
-
-      const token = gapi.client.getToken();
-      if (token === null) {
-        tokenClient.requestAccessToken({ prompt: "consent" });
-      } else {
-        tokenClient.requestAccessToken({ prompt: "" });
-      }
-    }
-
-    function handleSignoutClick() {
-      const token = gapi.client.getToken();
-      if (token !== null) {
-        google.accounts.oauth2.revoke(token.access_token);
-        gapi.client.setToken("");
-      }
-      eliFileId = null;
-      products = [];
-      renderProducts();
-      document.getElementById("btnSignout").style.display = "none";
-      document.getElementById("btnLoad").style.display = "none";
-      document.getElementById("btnSave").style.display = "none";
-      setStatus("已登出");
-      document.getElementById("fileInfo").textContent = "";
-      setDebug("");
-    }
-
-    async function findOrCreateFile() {
-      try {
-        const res = await gapi.client.drive.files.list({
-          q: `name='${ELI_FILENAME}' and trashed=false`,
-          fields: "files(id,name,mimeType,modifiedTime)"
-        });
-
-        const files = res.result.files || [];
-        if (files.length > 0) {
-          eliFileId = files[0].id;
-          document.getElementById("fileInfo").textContent = `已找到檔案：${files[0].name} (${eliFileId})`;
-          setStatus("已找到 eli.json，可以讀取");
-          await loadEliData();
-        } else {
-          const file = await gapi.client.drive.files.create({
-            resource: {
-              name: ELI_FILENAME,
-              mimeType: "application/json"
-            },
-            media: {
-              mimeType: "application/json",
-              body: JSON.stringify({ products: [] }, null, 2)
-            },
-            fields: "id,name"
-          });
-          eliFileId = file.result.id;
-          document.getElementById("fileInfo").textContent = `已建立新檔案：${file.result.name} (${eliFileId})`;
-          products = [];
-          renderProducts();
-          setStatus("已建立新 eli.json");
-        }
-      } catch (e) {
-        setStatus("找不到或建立檔案失敗");
-        setDebug(e);
-      }
-    }
-
-    async function loadEliData() {
-      if (!eliFileId) {
-        setStatus("未有 ELI 檔案 ID");
-        return;
-      }
-      try {
-        const res = await gapi.client.drive.files.get({
-          fileId: eliFileId,
-          alt: "media"
-        });
-
-        const text = res.body || "{}";
-        const data = JSON.parse(text);
-        products = Array.isArray(data.products) ? data.products : [];
-        renderProducts();
-        setStatus(`已載入 ${products.length} 筆產品`);
-        setDebug(data);
-      } catch (e) {
-        setStatus("讀檔失敗");
-        setDebug(e);
-      }
-    }
-
-    async function saveEliData() {
-      if (!eliFileId) {
-        setStatus("未有檔案 ID，先登入並建立 / 選擇檔案");
-        return;
-      }
-      try {
-        const content = JSON.stringify({ products }, null, 2);
-        await gapi.client.drive.files.update({
-          fileId: eliFileId,
-          media: {
-            mimeType: "application/json",
-            body: content
-          }
-        });
-        setStatus(`已儲存 ${products.length} 筆產品到 Google Drive`);
-        setDebug({ saved: true, count: products.length, fileId: eliFileId });
-      } catch (e) {
-        setStatus("寫檔失敗");
-        setDebug(e);
-      }
-    }
-
-    function addProduct() {
-      const p = {
-        id: document.getElementById("id").value.trim(),
-        market: document.getElementById("market").value,
-        underlying: document.getElementById("underlying").value.trim(),
-        currency: document.getElementById("currency").value,
-        ko_type: document.getElementById("ko_type").value,
-        ki_type: document.getElementById("ki_type").value,
-        strike: num("strike"),
-        ko_level: num("ko_level"),
-        ki_level: num("ki_level"),
-        latest_close: num("latest_close"),
-        observation_date: document.getElementById("observation_date").value,
-        maturity_date: document.getElementById("maturity_date").value,
-        rm_owner: document.getElementById("rm_owner").value.trim(),
-        client_name: document.getElementById("client_name").value.trim(),
-        notes: document.getElementById("notes").value.trim()
-      };
-
-      if (!p.id || !p.underlying) {
-        alert("請至少輸入產品編號同相關股票");
-        return;
-      }
-
-      const idx = products.findIndex(x => x.id === p.id);
-      if (idx >= 0) products[idx] = p;
-      else products.unshift(p);
-
-      renderProducts();
-      setStatus(`已加入 / 更新產品：${p.id}`);
-    }
-
-    function num(id) {
-      const v = parseFloat(document.getElementById(id).value);
-      return Number.isFinite(v) ? v : null;
-    }
-
-    function clearForm() {
-      ["id","underlying","strike","ko_level","ki_level","latest_close","rm_owner","client_name","notes"].forEach(id => {
-        document.getElementById(id).value = "";
-      });
-      document.getElementById("market").value = "HK";
-      document.getElementById("currency").value = "HKD";
-      document.getElementById("ko_type").value = "daily";
-      document.getElementById("ki_type").value = "EKI";
-      document.getElementById("observation_date").value = "";
-      document.getElementById("maturity_date").value = "";
-    }
-
-    function calcStatus(p) {
-      if (p.latest_close == null || p.ko_level == null || p.ki_level == null) return { label: "未知", cls: "muted" };
-      const koPct = (p.latest_close / p.ko_level) * 100;
-      const kiPct = (p.latest_close / p.ki_level) * 100;
-      if (koPct >= 100) return { label: "可早贖回", cls: "ok" };
-      if (koPct >= 97) return { label: "接近 KO", cls: "warn" };
-      if (kiPct <= 105) return { label: "接近 KI", cls: "bad" };
-      return { label: "正常", cls: "muted" };
-    }
-
-    function renderProducts() {
-      const rows = products.map(p => {
-        const st = calcStatus(p);
-        return `
-          <tr>
-            <td>${escapeHtml(p.id || "")}</td>
-            <td>${escapeHtml(p.underlying || "")}</td>
-            <td>${escapeHtml(p.market || "")}</td>
-            <td>${escapeHtml(p.currency || "")}</td>
-            <td>${escapeHtml(p.ko_type || "")}</td>
-            <td>${escapeHtml(p.ki_type || "")}</td>
-            <td>${fmt(p.latest_close)}</td>
-            <td>${fmt(p.ko_level)}</td>
-            <td>${fmt(p.ki_level)}</td>
-            <td class="${st.cls}">${st.label}</td>
-          </tr>
-        `;
-      }).join("");
-
-      document.getElementById("summary").textContent = `總數：${products.length}`;
-      document.getElementById("tableWrap").innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>產品編號</th>
-              <th>相關股票</th>
-              <th>市場</th>
-              <th>貨幣</th>
-              <th>KO 類型</th>
-              <th>KI 類型</th>
-              <th>收市價</th>
-              <th>KO</th>
-              <th>KI</th>
-              <th>狀態</th>
-            </tr>
-          </thead>
-          <tbody>${rows || "<tr><td colspan='10' class='muted'>未有資料</td></tr>"}</tbody>
-        </table>
-      `;
-    }
-
-    function fmt(v) {
-      return (v === null || v === undefined || Number.isNaN(v)) ? "" : Number(v).toFixed(2);
-    }
-
-    function escapeHtml(s) {
-      return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
-    }
-
-    window.addEventListener("load", () => {
-      document.getElementById("btnAuth").disabled = true;
-      renderProducts();
-    });
-  </script>
+</div>
+<div id="drawer" class="drawer"><button class="btn sec" onclick="closeDrawer()">關閉</button><div id="drawerContent"></div></div>
+<script>
+const CLIENT_ID = "1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com";
+const DISCOVERY_DOC = "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest";
+const SCOPES = "https://www.googleapis.com/auth/drive.file";
+const ELI_FILENAME = "eli.json";
+let tokenClient, gapiInited=false, gisInited=false, eliFileId=null;
+let products = [];
+let currentFilter = 'all';
+function setStatus(x){document.getElementById('status').textContent=x}
+function setDebug(x){document.getElementById('debug').textContent=typeof x==='string'?x:JSON.stringify(x,null,2)}
+function gapiLoaded(){gapi.load('client', initializeGapiClient)}
+async function initializeGapiClient(){await gapi.client.init({discoveryDocs:[DISCOVERY_DOC]});gapiInited=true;maybeEnableButtons()}
+function gisLoaded(){tokenClient=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPES,callback:''});gisInited=true;maybeEnableButtons()}
+function maybeEnableButtons(){if(gapiInited&&gisInited)document.getElementById('btnAuth').disabled=false}
+function handleAuthClick(){tokenClient.callback=async(resp)=>{if(resp.error){setStatus('登入失敗');setDebug(resp);return}document.getElementById('btnSignout').style.display='inline-block';document.getElementById('btnLoad').style.display='inline-block';document.getElementById('btnSave').style.display='inline-block';setStatus('登入成功');await findOrCreateFile()};if(gapi.client.getToken()==null)tokenClient.requestAccessToken({prompt:'consent'});else tokenClient.requestAccessToken({prompt:''})}
+function handleSignoutClick(){const t=gapi.client.getToken();if(t){google.accounts.oauth2.revoke(t.access_token);gapi.client.setToken('')}eliFileId=null;products=[];render();document.getElementById('btnSignout').style.display='none';document.getElementById('btnLoad').style.display='none';document.getElementById('btnSave').style.display='none';setStatus('已登出');document.getElementById('fileInfo').textContent='';setDebug('')}
+async function findOrCreateFile(){try{const res=await gapi.client.drive.files.list({q:`name='${ELI_FILENAME}' and trashed=false`,fields:'files(id,name,modifiedTime)'});const files=res.result.files||[];if(files.length){eliFileId=files[0].id;document.getElementById('fileInfo').textContent=`已找到：${files[0].name} (${eliFileId})`;await loadEliData()}else{const file=await gapi.client.drive.files.create({resource:{name:ELI_FILENAME,mimeType:'application/json'},media:{mimeType:'application/json',body:JSON.stringify({products:[]},null,2)},fields:'id,name'});eliFileId=file.result.id;document.getElementById('fileInfo').textContent=`已建立：${file.result.name} (${eliFileId})`;products=[];render()}}catch(e){setStatus('搜尋 / 建立檔案失敗');setDebug(e)}}
+async function loadEliData(){if(!eliFileId){setStatus('未有檔案 ID');return}try{const res=await gapi.client.drive.files.get({fileId:eliFileId,alt:'media'});const data=JSON.parse(res.body||'{}');products=Array.isArray(data.products)?data.products:[];setStatus(`已載入 ${products.length} 筆`);render();setDebug(data)}catch(e){setStatus('讀檔失敗');setDebug(e)}}
+async function saveToDrive(){if(!eliFileId){setStatus('未有檔案 ID');return}try{await gapi.client.drive.files.update({fileId:eliFileId,media:{mimeType:'application/json',body:JSON.stringify({products},null,2)}});setStatus(`已儲存 ${products.length} 筆`);setDebug({saved:true,count:products.length,fileId:eliFileId})}catch(e){setStatus('儲存失敗');setDebug(e)}}
+function saveFromForm(){const p={id:v('id')||`ELI-${Date.now()}`,client_name:v('client_name'),rm_owner:v('rm_owner'),issuer:v('issuer'),currency:v('currency'),tenor_months:n('tenor_months'),coupon_pct:n('coupon_pct'),fee_pct:n('fee_pct'),issue_date:v('issue_date'),notes:v('notes'),status:v('status')||'normal',underlyings:v('underlyings').split(',').map(s=>s.trim()).filter(Boolean)};const idx=products.findIndex(x=>x.id===p.id);if(idx>=0)products[idx]={...products[idx],...p};else products.unshift(p);render();setStatus(`已加入/更新：${p.id}`)}
+function v(id){return document.getElementById(id).value.trim()}
+function n(id){const x=parseFloat(document.getElementById(id).value);return Number.isFinite(x)?x:null}
+function clearForm(){['id','client_name','rm_owner','issuer','tenor_months','coupon_pct','fee_pct','issue_date','notes','underlyings'].forEach(i=>document.getElementById(i).value='');document.getElementById('currency').value='HKD';document.getElementById('status').value='normal'}
+function setFilter(f){currentFilter=f;document.querySelectorAll('.pill').forEach(b=>b.classList.toggle('active',b.dataset.filter===f));render()}
+function productStatus(p){return p.status||'normal'}
+function matchSearch(p,s){if(!s)return true;const txt=[p.id,p.client_name,p.rm_owner,p.issuer,p.currency,p.notes,...(p.underlyings||[])].join(' ').toLowerCase();return txt.includes(s.toLowerCase())}
+function filterOK(p){const st=productStatus(p);return currentFilter==='all'||st===currentFilter}
+function render(){const q=document.getElementById('searchBox').value.trim();const list=products.filter(p=>filterOK(p)&&matchSearch(p,q));document.getElementById('kpiTotal').textContent=products.length;document.getElementById('kpiKO').textContent=products.filter(p=>p.status==='ko').length;document.getElementById('kpiNearKO').textContent=products.filter(p=>p.status==='near_ko').length;document.getElementById('kpiNearKI').textContent=products.filter(p=>p.status==='near_ki').length;document.getElementById('list').innerHTML=list.map(renderItem).join('')||'<div class="mut">未有符合條件的持倉</div>'}
+function renderItem(p){const st=p.status==='ko'?['可早贖回','ok']:p.status==='near_ko'?['接近 KO','warn']:p.status==='near_ki'?['接近 KI','bad']:['正常',''];const under=(p.underlyings||[]).join(' / ')||'未填 underlyings';return `<div class="item"><div><h3>${esc(p.client_name||'')}${p.client_name?' · ':''}${esc(p.id||'')}</h3><div class="meta"><div><strong>Issuer:</strong> ${esc(p.issuer||'')} · <strong>CCY:</strong> ${esc(p.currency||'')} · <strong>RM:</strong> ${esc(p.rm_owner||'')}</div><div><strong>Tenor:</strong> ${esc(String(p.tenor_months||''))} months · <strong>Coupon:</strong> ${esc(String(p.coupon_pct||''))}% · <strong>Fee:</strong> ${esc(String(p.fee_pct||''))}%</div><div><strong>Underlyings:</strong> ${esc(under)}</div><div>${esc(p.notes||'')}</div></div></div><div class="meta"><div><strong>Issue:</strong> ${esc(p.issue_date||'')}</div><div><strong>Status:</strong> <span class="${st[1]}">${st[0]}</span></div></div><div class="status"><button class="btn sec" onclick='openDrawer(${JSON.stringify(p).replaceAll("'", "\\'")})'>詳情</button></div></div>`}
+function openDrawer(p){document.getElementById('drawer').classList.add('open');document.getElementById('drawerContent').innerHTML=`<h2>${esc(p.id||'')}</h2><pre>${esc(JSON.stringify(p,null,2))}</pre>`}
+function closeDrawer(){document.getElementById('drawer').classList.remove('open')}
+function esc(s){return String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;')}
+window.addEventListener('load',()=>{document.getElementById('btnAuth').disabled=true;render()});
+</script>
 </body>
 </html>
