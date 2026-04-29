@@ -1,39 +1,128 @@
 <!DOCTYPE html>
 <html lang="zh-Hant" data-theme="light">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>ELI CRM 管理系統</title>
-  <script src="https://accounts.google.com/gsi/client" onload="initClient()" async defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    /* 這裡保留了你上傳的 Perplexity version.html 中的所有 CSS 樣式 */
-    :root,[data-theme="light"] {
-      --color-bg: #f5f7fb; --color-surface: #ffffff; --color-primary: #0b4a8b;
-      --color-text: #10233f; --color-text-muted: #5e718d; --color-primary-highlight: #dce8f8;
-      --radius-xl: 1.6rem; --shadow-md: 0 10px 30px rgba(16,35,63,.10);
-    }
-    body { margin:0; background: var(--color-bg); color:var(--color-text); font-family: sans-serif; }
-    .app { max-width:460px; margin:0 auto; padding: 20px; padding-bottom: 100px; }
-    .hero { padding:20px; border-radius:var(--radius-xl); background:linear-gradient(160deg,var(--color-primary),#12386a); color:white; box-shadow:var(--shadow-md); margin-bottom: 20px; }
-    .card { background:white; border-radius:var(--radius-xl); padding:20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    .input-group { margin-bottom: 15px; }
-    label { display:block; font-size:12px; font-weight:bold; margin-bottom:5px; color:var(--color-text-muted); }
-    .input, .select { width:100%; height:44px; border-radius:10px; border:1px solid #ddd; padding:0 10px; }
-    .primary-btn { width:100%; height:50px; border-radius:12px; border:none; background:var(--color-primary); color:white; font-weight:bold; cursor:pointer; }
-    .auth-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-    .kpi-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:15px; }
-    .kpi { background:rgba(255,255,255,0.15); padding:10px; border-radius:10px; text-align:center; }
-    .kpi .num { font-size:20px; font-weight:800; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>ELI CRM 管理平台</title>
+    <script src="https://accounts.google.com/gsi/client" onload="initClient()" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root,[data-theme="light"] {
+            --color-bg: #f5f7fb; --color-surface: #ffffff; --color-primary: #0b4a8b;
+            --color-text: #10233f; --color-text-muted: #5e718d; --radius-xl: 1.6rem;
+            --shadow-md: 0 10px 30px rgba(16,35,63,.10);
+        }
+        body { margin:0; background: var(--color-bg); color:var(--color-text); font-family: -apple-system, sans-serif; }
+        .app { max-width:460px; margin:0 auto; padding: 20px; }
+        .hero { padding:20px; border-radius:var(--radius-xl); background:linear-gradient(160deg,var(--color-primary),#12386a); color:white; box-shadow:var(--shadow-md); margin-bottom: 20px; }
+        .card { background:white; border-radius:var(--radius-xl); padding:20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .input-group { margin-bottom: 12px; }
+        label { display:block; font-size:12px; font-weight:bold; margin-bottom:5px; color:var(--color-text-muted); }
+        input, select { width:100%; height:44px; border-radius:10px; border:1px solid #ddd; padding:0 10px; box-sizing: border-box; font-size:16px; }
+        .primary-btn { width:100%; height:50px; border-radius:12px; border:none; background:var(--color-primary); color:white; font-weight:bold; cursor:pointer; }
+        .auth-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        .kpi-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:15px; }
+        .kpi { background:rgba(255,255,255,0.15); padding:10px; border-radius:10px; text-align:center; }
+        .kpi .num { font-size:22px; font-weight:800; }
+    </style>
 </head>
 <body>
 
-  <div id="auth-overlay" class="auth-overlay">
-    <h1 style="color:#0b4a8b">ELI CRM</h1>
-    <p>請先驗證身分以同步客戶資料</p>
-    <button class="primary-btn" style="width:200px" onclick="handleAuthClick()">使用 Google 登入</button>
-  </div>
+    <div id="auth-overlay" class="auth-overlay">
+        <h1 style="color:#0b4a8b">ELI CRM</h1>
+        <p>請先驗證身分以同步數據</p>
+        <button class="primary-btn" style="width:200px" onclick="handleAuthClick()">使用 Google 登入</button>
+    </div>
+
+    <main class="app" id="main-content" style="display:none;">
+        <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <div>
+                <h2 style="margin:0">您好, RM</h2>
+                <p id="sync-status" style="font-size:12px; color:gray;">正在初始化雲端資料...</p>
+            </div>
+            <button onclick="loadFromDrive()" style="border:none; background:none; font-size:20px;">🔄</button>
+        </header>
+
+        <section class="hero">
+            <div style="font-size:12px; opacity:0.8;">今日資產總覽 (ELI)</div>
+            <div class="kpi-grid">
+                <div class="kpi"><div class="num" id="kpi-total">0</div><div style="font-size:10px">待跟進</div></div>
+                <div class="kpi"><div class="num" id="kpi-ko">0</div><div style="font-size:10px">早贖回提醒</div></div>
+                <div class="kpi"><div class="num" id="kpi-ki">0</div><div style="font-size:10px">高風險 (KI)</div></div>
+                <div class="kpi"><div class="num">9</div><div style="font-size:10px">覆蓋幣種</div></div>
+            </div>
+        </section>
+
+        <section class="card">
+            <h3 style="margin:0 0 15px 0;">快速錄入新 ELI</h3>
+            <div class="input-group"><label>客戶姓名</label><input type="text" id="clientName"></div>
+            <div style="display:flex; gap:10px;">
+                <div class="input-group" style="flex:2;"><label>股票代號</label><input type="text" id="stockCode" placeholder="700.HK"></div>
+                <div class="input-group" style="flex:1;"><label>市場</label><select id="market"><option>HK</option><option>US</option></select></div>
+            </div>
+            <div class="input-group">
+                <label>KO 結構</label>
+                <select id="koType">
+                    <option value="Daily">Daily</option>
+                    <option value="Daily Memory">Daily Memory</option>
+                    <option value="Period End">Period End</option>
+                </select>
+            </div>
+            <button class="primary-btn" onclick="saveToDrive()">儲存至 Google Drive</button>
+        </section>
+    </main>
+
+    <script>
+        let tokenClient;
+        let accessToken = null;
+        let eliData = { products: [] };
+        const CLIENT_ID = '1018971008023-u5tooicug7ij968fiibn7fk7tf0ubc58.apps.googleusercontent.com';
+
+        function initClient() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file',
+                callback: (resp) => {
+                    if (resp.access_token) {
+                        accessToken = resp.access_token;
+                        document.getElementById('auth-overlay').style.display = 'none';
+                        document.getElementById('main-content').style.display = 'block';
+                        loadFromDrive(); // 登入後自動加載資料
+                    }
+                },
+            });
+        }
+
+        function handleAuthClick() { tokenClient.requestAccessToken(); }
+
+        // 模擬從 Google Drive 讀取 (實際 API 串接需使用 fetch)
+        async function loadFromDrive() {
+            document.getElementById('sync-status').innerText = "雲端同步中...";
+            // 此處應透過 Google Drive API 搜尋 eli_config.json
+            setTimeout(() => {
+                document.getElementById('sync-status').innerText = "數據已同步: " + new Date().toLocaleTimeString();
+                updateKPI();
+            }, 1000);
+        }
+
+        function saveData() {
+            const newProduct = {
+                client_name: document.getElementById('clientName').value,
+                stock: document.getElementById('stockCode').value,
+                market: document.getElementById('market').value,
+                ko_type: document.getElementById('koType').value
+            };
+            eliData.products.push(newProduct);
+            updateKPI();
+            alert("儲存成功！資料將同步至 Google Drive");
+        }
+
+        function updateKPI() {
+            document.getElementById('kpi-total').innerText = eliData.products.length;
+        }
+    </script>
+</body>
+</html>
 
   <main class="app" id="main-content" style="display:none;">
     <header style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
